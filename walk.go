@@ -2,13 +2,15 @@ package hidraw
 
 import (
 	"io/fs"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 )
 
-const hidrawPath = "/sys/class/hidraw"
-const ueventFile = "/device/uevent"
+const (
+	hidrawPath = "/sys/class/hidraw"
+	ueventFile = "/device/uevent"
+)
 
 type Hidraw struct {
 	PathName string
@@ -30,7 +32,7 @@ func Walk() []Hidraw {
 		if path == hidrawPath {
 			return nil
 		}
-		uevent, err := ioutil.ReadFile(filepath.Join(path, ueventFile))
+		uevent, err := os.ReadFile(filepath.Join(path, ueventFile))
 		if err != nil {
 			return nil
 		}
