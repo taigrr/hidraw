@@ -25,7 +25,7 @@ type Hidraw struct {
 
 func Walk() []Hidraw {
 	var hidraw []Hidraw
-	filepath.WalkDir(hidrawPath, func(path string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(hidrawPath, func(path string, d fs.DirEntry, _ error) error {
 		dev := Hidraw{}
 		dev.Path = d.Name()
 		dev.PathName = "/dev/" + d.Name()
