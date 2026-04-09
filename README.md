@@ -1,21 +1,23 @@
 # hidraw
 
-A Go library for discovering and interacting with HID (Human Interface Device) raw devices on Linux systems.
+A Go library for discovering HID (Human Interface Device) raw devices on Linux via sysfs, with built-in USB vendor/device name resolution.
 
 ## Overview
 
-This library provides a simple interface to discover and access HID raw devices on Linux systems. It reads device information from `/sys/class/hidraw` and provides structured access to device properties.
+`hidraw` reads device information from `/sys/class/hidraw` and returns structured data for each HID raw device, including driver info, HID IDs, and human-readable vendor/device names looked up from the USB ID database.
 
 ## Features
 
 - Discover all HID raw devices on the system
-- Access device properties including:
-  - Driver information
-  - HID ID
-  - Device name
-  - Physical location
-  - Unique identifier
-  - Modalias
+- Parse HID ID strings into vendor and device IDs
+- Look up vendor and device names from an embedded USB ID database
+- Optionally load the system USB ID database (`/usr/share/hwdata/usb.ids`)
+
+## Installation
+
+```bash
+go get github.com/taigrr/hidraw
+```
 
 ## Usage
 
@@ -23,40 +25,76 @@ This library provides a simple interface to discover and access HID raw devices 
 package main
 
 import (
-    "fmt"
-    "github.com/taigrr/hidraw"
+	"fmt"
+
+	"github.com/taigrr/hidraw"
 )
 
 func main() {
-    // Get all HID raw devices
-    devices := hidraw.Walk()
-    
-    // Print device information
-    for _, device := range devices {
-        fmt.Printf("Device: %s\n", device.PathName)
-        fmt.Printf("  Driver: %s\n", device.DRIVER)
-        fmt.Printf("  Name: %s\n", device.HID_NAME)
-        fmt.Printf("  Physical: %s\n", device.HID_PHYS)
-        fmt.Printf("  Unique ID: %s\n", device.HID_UNIQ)
-    }
+	devs := hidraw.Walk()
+	for _, d := range devs {
+		fmt.Printf("%s: %s", d.PathName, d.HidName)
+		if d.VendorName != "" {
+			fmt.Printf(" [%s", d.VendorName)
+			if d.DeviceName != "" {
+				fmt.Printf(" — %s", d.DeviceName)
+			}
+			fmt.Print("]")
+		}
+		fmt.Println()
+	}
 }
 ```
 
-## Device Information
+## API
 
-The `Hidraw` struct provides the following fields:
+### `hidraw.Walk() []Hidraw`
 
-- `PathName`: Full device path (e.g., "/dev/hidraw0")
-- `Path`: Device name (e.g., "hidraw0")
-- `DRIVER`: Device driver name
-- `HID_ID`: HID device identifier
-- `HID_NAME`: Human-readable device name
-- `HID_PHYS`: Physical location of the device
-- `HID_UNIQ`: Unique device identifier
-- `MODALIAS`: Device modalias string
+Discovers all hidraw devices. Errors reading individual devices are silently ignored.
+
+### `hidraw.WalkErr() ([]Hidraw, error)`
+
+Like `Walk`, but returns an error if the hidraw sysfs directory cannot be walked.
+
+### `Hidraw` struct
+
+| Field        | Type      | Description                              |
+| ------------ | --------- | ---------------------------------------- |
+| `PathName`   | `string`  | Full device path (e.g. `/dev/hidraw0`)   |
+| `Path`       | `string`  | Device name (e.g. `hidraw0`)             |
+| `Driver`     | `string`  | Kernel driver name                       |
+| `HidID`      | `string`  | Raw HID ID (`bus:vendor:device` hex)     |
+| `HidName`    | `string`  | Human-readable device name from uevent   |
+| `HidPhys`    | `string`  | Physical location of the device          |
+| `HidUniq`    | `string`  | Unique device identifier                 |
+| `Modalias`   | `string`  | Device modalias string                   |
+| `VendorID`   | `usbid.ID`| Parsed vendor ID                         |
+| `DeviceID`   | `usbid.ID`| Parsed device ID                         |
+| `VendorName` | `string`  | Looked-up vendor name (e.g. `Logitech`)  |
+| `DeviceName` | `string`  | Looked-up device name                    |
+
+### `usbids` subpackage
+
+```go
+import usbid "github.com/taigrr/hidraw/usbids"
+
+// Look up by ID
+name := usbid.LookupVendor(usbid.ID(0x046d))   // "Logitech, Inc."
+name  = usbid.LookupDevice(usbid.ID(0x046d), usbid.ID(0xc52b))
+
+// Load system DB instead of embedded
+usbid.LoadSystemDB()
+
+// Parse a custom usb.ids file
+vendors, err := usbid.Parse(reader)
+```
 
 ## Requirements
 
 - Linux operating system
-- Go 1.16 or later
+- Go 1.21 or later
 - Access to `/sys/class/hidraw` directory
+
+## License
+
+0BSD — see [LICENSE](LICENSE).
