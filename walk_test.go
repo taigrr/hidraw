@@ -48,19 +48,12 @@ func TestParseDevice(t *testing.T) {
 func TestParseDeviceReadsUeventFields(t *testing.T) {
 	tempDir := t.TempDir()
 	sysPath := filepath.Join(tempDir, "hidraw0")
-	if err := os.MkdirAll(filepath.Join(sysPath, "device"), 0o755); err != nil {
-		t.Fatalf("MkdirAll() error = %v", err)
-	}
-
-	uevent := "DRIVER=hid-generic\n" +
-		"HID_ID=0003:0000046D:0000C52B\n" +
-		"HID_NAME=Gaming Receiver\n" +
-		"HID_PHYS=usb-0000:00:14.0-3/input2\n" +
-		"HID_UNIQ=abc123\n" +
-		"MODALIAS=hid:b0003g0001v0000046Dp0000C52B\n"
-	if err := os.WriteFile(filepath.Join(sysPath, "device", "uevent"), []byte(uevent), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
+	writeTestUevent(t, sysPath, "DRIVER=hid-generic\n"+
+		"HID_ID=0003:0000046D:0000C52B\n"+
+		"HID_NAME=Gaming Receiver\n"+
+		"HID_PHYS=usb-0000:00:14.0-3/input2\n"+
+		"HID_UNIQ=abc123\n"+
+		"MODALIAS=hid:b0003g0001v0000046Dp0000C52B\n")
 
 	dev := parseDevice(sysPath, "hidraw0")
 	if dev.Path != "hidraw0" || dev.PathName != "/dev/hidraw0" {
@@ -92,5 +85,35 @@ func TestParseDeviceReadsUeventFields(t *testing.T) {
 	}
 	if dev.DeviceName == "" {
 		t.Error("DeviceName should not be empty for a known Logitech receiver")
+	}
+}
+
+func TestWalkErrAtReturnsTopLevelDevicesOnly(t *testing.T) {
+	root := t.TempDir()
+	writeTestUevent(t, filepath.Join(root, "hidraw0"), "HID_ID=0003:0000046D:0000C52B\n")
+	writeTestUevent(t, filepath.Join(root, "hidraw1"), "HID_ID=0003:000005AC:00008242\n")
+	if err := os.WriteFile(filepath.Join(root, "README.txt"), []byte("not a device"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	devices, err := walkErrAt(root)
+	if err != nil {
+		t.Fatalf("walkErrAt() error = %v", err)
+	}
+	if len(devices) != 2 {
+		t.Fatalf("len(devices) = %d, want 2", len(devices))
+	}
+	if devices[0].Path != "hidraw0" || devices[1].Path != "hidraw1" {
+		t.Fatalf("unexpected device paths: %#v", []string{devices[0].Path, devices[1].Path})
+	}
+}
+
+func writeTestUevent(t *testing.T, sysPath, contents string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(sysPath, "device"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(sysPath, "device", "uevent"), []byte(contents), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
 	}
 }
