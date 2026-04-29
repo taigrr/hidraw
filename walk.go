@@ -43,20 +43,43 @@ func Walk() []Hidraw {
 // hidraw sysfs directory cannot be walked at all. Errors reading individual
 // device uevent files are silently skipped.
 func WalkErr() ([]Hidraw, error) {
+	return walkErrAt(hidrawPath)
+}
+
+func walkErrAt(root string) ([]Hidraw, error) {
 	var devices []Hidraw
-	err := filepath.WalkDir(hidrawPath, func(path string, d fs.DirEntry, walkErr error) error {
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		if path == hidrawPath {
+		if path == root {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		if strings.ContainsRune(rel, filepath.Separator) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasPrefix(d.Name(), "hidraw") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		dev := parseDevice(path, d.Name())
 		devices = append(devices, dev)
+		if d.IsDir() {
+			return filepath.SkipDir
+		}
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("walking %s: %w", hidrawPath, err)
+		return nil, fmt.Errorf("walking %s: %w", root, err)
 	}
 	return devices, nil
 }

@@ -1,6 +1,8 @@
 package hidraw
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	usbid "github.com/taigrr/hidraw/usbids"
@@ -40,5 +42,78 @@ func TestParseDevice(t *testing.T) {
 	}
 	if dev.Driver != "" {
 		t.Errorf("Driver should be empty for nonexistent path, got %q", dev.Driver)
+	}
+}
+
+func TestParseDeviceReadsUeventFields(t *testing.T) {
+	tempDir := t.TempDir()
+	sysPath := filepath.Join(tempDir, "hidraw0")
+	writeTestUevent(t, sysPath, "DRIVER=hid-generic\n"+
+		"HID_ID=0003:0000046D:0000C52B\n"+
+		"HID_NAME=Gaming Receiver\n"+
+		"HID_PHYS=usb-0000:00:14.0-3/input2\n"+
+		"HID_UNIQ=abc123\n"+
+		"MODALIAS=hid:b0003g0001v0000046Dp0000C52B\n")
+
+	dev := parseDevice(sysPath, "hidraw0")
+	if dev.Path != "hidraw0" || dev.PathName != "/dev/hidraw0" {
+		t.Fatalf("unexpected path fields: %+v", dev)
+	}
+	if dev.Driver != "hid-generic" {
+		t.Errorf("Driver = %q, want %q", dev.Driver, "hid-generic")
+	}
+	if dev.HidID != "0003:0000046D:0000C52B" {
+		t.Errorf("HidID = %q, want %q", dev.HidID, "0003:0000046D:0000C52B")
+	}
+	if dev.HidName != "Gaming Receiver" {
+		t.Errorf("HidName = %q, want %q", dev.HidName, "Gaming Receiver")
+	}
+	if dev.HidPhys != "usb-0000:00:14.0-3/input2" {
+		t.Errorf("HidPhys = %q, want %q", dev.HidPhys, "usb-0000:00:14.0-3/input2")
+	}
+	if dev.HidUniq != "abc123" {
+		t.Errorf("HidUniq = %q, want %q", dev.HidUniq, "abc123")
+	}
+	if dev.Modalias != "hid:b0003g0001v0000046Dp0000C52B" {
+		t.Errorf("Modalias = %q, want %q", dev.Modalias, "hid:b0003g0001v0000046Dp0000C52B")
+	}
+	if dev.VendorID != usbid.ID(0x046d) || dev.DeviceID != usbid.ID(0xc52b) {
+		t.Errorf("parsed IDs = (%#x, %#x), want (%#x, %#x)", dev.VendorID, dev.DeviceID, usbid.ID(0x046d), usbid.ID(0xc52b))
+	}
+	if dev.VendorName != "Logitech, Inc." {
+		t.Errorf("VendorName = %q, want %q", dev.VendorName, "Logitech, Inc.")
+	}
+	if dev.DeviceName == "" {
+		t.Error("DeviceName should not be empty for a known Logitech receiver")
+	}
+}
+
+func TestWalkErrAtReturnsTopLevelDevicesOnly(t *testing.T) {
+	root := t.TempDir()
+	writeTestUevent(t, filepath.Join(root, "hidraw0"), "HID_ID=0003:0000046D:0000C52B\n")
+	writeTestUevent(t, filepath.Join(root, "hidraw1"), "HID_ID=0003:000005AC:00008242\n")
+	if err := os.WriteFile(filepath.Join(root, "README.txt"), []byte("not a device"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	devices, err := walkErrAt(root)
+	if err != nil {
+		t.Fatalf("walkErrAt() error = %v", err)
+	}
+	if len(devices) != 2 {
+		t.Fatalf("len(devices) = %d, want 2", len(devices))
+	}
+	if devices[0].Path != "hidraw0" || devices[1].Path != "hidraw1" {
+		t.Fatalf("unexpected device paths: %#v", []string{devices[0].Path, devices[1].Path})
+	}
+}
+
+func writeTestUevent(t *testing.T, sysPath, contents string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(sysPath, "device"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(sysPath, "device", "uevent"), []byte(contents), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
 	}
 }
