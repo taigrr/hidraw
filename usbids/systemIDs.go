@@ -15,7 +15,11 @@ var Vendors map[ID]Vendor
 // package-level Vendors map. Returns the parsed vendors or an error if the
 // system database cannot be read or parsed.
 func LoadSystemDB() (map[ID]Vendor, error) {
-	file, err := os.Open(systemDB)
+	return loadDB(systemDB)
+}
+
+func loadDB(path string) (map[ID]Vendor, error) {
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
