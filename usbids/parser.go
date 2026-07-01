@@ -50,11 +50,8 @@ func Parse(r io.Reader) (map[ID]Vendor, error) {
 			hexStr := trimmed[:4]
 			id, err := parseHexID(hexStr)
 			if err != nil {
-				// Non-vendor top-level lines (like "C 00  ...") are
-				// device classes or other sections — stop parsing vendors.
-				if trimmed[0] == 'C' || trimmed[0] == 'A' || trimmed[0] == 'H' || trimmed[0] == 'L' || trimmed[0] == 'P' || trimmed[0] == 'V' || trimmed[0] == 'R' || trimmed[0] == 'B' {
-					break
-				}
+				currentVendor = nil
+				currentDevice = nil
 				continue
 			}
 			name := strings.TrimSpace(trimmed[4:])
