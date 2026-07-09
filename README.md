@@ -92,7 +92,7 @@ vendors, err := usbid.Parse(reader)
 ## Requirements
 
 - Linux operating system
-- Go 1.21 or later
+- Go 1.26 or later
 - Access to `/sys/class/hidraw` directory
 
 ## License
