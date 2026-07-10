@@ -88,6 +88,26 @@ func TestParseDeviceReadsUeventFields(t *testing.T) {
 	}
 }
 
+func TestParseDeviceSkipsMalformedUeventLines(t *testing.T) {
+	tempDir := t.TempDir()
+	sysPath := filepath.Join(tempDir, "hidraw0")
+	writeTestUevent(t, sysPath, "DRIVER=hid-generic\n"+
+		"malformed line\n"+
+		"HID_NAME=Keyboard=with=suffix\n"+
+		"HID_ID=0003:0000046D:0000C52B\n")
+
+	dev := parseDevice(sysPath, "hidraw0")
+	if dev.Driver != "hid-generic" {
+		t.Errorf("Driver = %q, want %q", dev.Driver, "hid-generic")
+	}
+	if dev.HidName != "Keyboard=with=suffix" {
+		t.Errorf("HidName = %q, want %q", dev.HidName, "Keyboard=with=suffix")
+	}
+	if dev.VendorID != usbid.ID(0x046d) || dev.DeviceID != usbid.ID(0xc52b) {
+		t.Errorf("parsed IDs = (%#x, %#x), want (%#x, %#x)", dev.VendorID, dev.DeviceID, usbid.ID(0x046d), usbid.ID(0xc52b))
+	}
+}
+
 func TestWalkErrAtReturnsTopLevelDevicesOnly(t *testing.T) {
 	root := t.TempDir()
 	writeTestUevent(t, filepath.Join(root, "hidraw0"), "HID_ID=0003:0000046D:0000C52B\n")
@@ -105,6 +125,17 @@ func TestWalkErrAtReturnsTopLevelDevicesOnly(t *testing.T) {
 	}
 	if devices[0].Path != "hidraw0" || devices[1].Path != "hidraw1" {
 		t.Fatalf("unexpected device paths: %#v", []string{devices[0].Path, devices[1].Path})
+	}
+}
+
+func TestWalkErrAtReturnsWalkErrors(t *testing.T) {
+	missingRoot := filepath.Join(t.TempDir(), "missing")
+	devices, err := walkErrAt(missingRoot)
+	if err == nil {
+		t.Fatal("walkErrAt() error = nil, want error")
+	}
+	if devices != nil {
+		t.Fatalf("devices = %#v, want nil", devices)
 	}
 }
 
