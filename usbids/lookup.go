@@ -29,3 +29,21 @@ func LookupDevice(vendorID, deviceID ID) string {
 	}
 	return d.Name
 }
+
+// LookupInterface returns the interface name for the given vendor, device, and
+// interface IDs, or an empty string if not found.
+func LookupInterface(vendorID, deviceID, interfaceID ID) string {
+	v, ok := Vendors[vendorID]
+	if !ok {
+		return ""
+	}
+	d, ok := v.Devices[deviceID]
+	if !ok {
+		return ""
+	}
+	iface, ok := d.Interfaces[interfaceID]
+	if !ok {
+		return ""
+	}
+	return iface.Name
+}
