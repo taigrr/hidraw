@@ -78,6 +78,29 @@ func TestParseCommentsOnly(t *testing.T) {
 	}
 }
 
+func TestParseDoesNotAttachClassDevicesToPreviousVendor(t *testing.T) {
+	input := `0001  Test Vendor
+	0001  Test Device
+C 00  Device
+	03  Human Interface Device
+0002  Another Vendor
+	0002  Another Device
+`
+
+	vendors, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	vendor := vendors[ID(0x0001)]
+	if _, ok := vendor.Devices[ID(0x03)]; ok {
+		t.Fatal("class entry 03 was parsed as a device under vendor 0001")
+	}
+	if _, ok := vendors[ID(0x0002)]; !ok {
+		t.Fatal("vendor 0002 was not parsed after class section")
+	}
+}
+
 func TestParseEmbeddedIDs(t *testing.T) {
 	// Verify that the embedded DB was parsed successfully at init.
 	if Vendors == nil {
