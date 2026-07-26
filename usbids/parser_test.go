@@ -1,6 +1,8 @@
 package usbid
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -89,5 +91,50 @@ func TestParseEmbeddedIDs(t *testing.T) {
 	logitech := Vendors[ID(0x046d)]
 	if logitech.Name == "" {
 		t.Error("expected Logitech (046d) to be present in embedded DB")
+	}
+}
+
+func TestLoadDBReplacesVendors(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "usb.ids")
+	const customDB = `1234  Custom Vendor
+	5678  Custom Device
+`
+	if err := os.WriteFile(dbPath, []byte(customDB), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	original := Vendors
+	t.Cleanup(func() {
+		Vendors = original
+	})
+
+	vendors, err := loadDB(dbPath)
+	if err != nil {
+		t.Fatalf("loadDB() error = %v", err)
+	}
+	if len(vendors) != 1 {
+		t.Fatalf("len(vendors) = %d, want 1", len(vendors))
+	}
+	if Vendors[ID(0x1234)].Name != "Custom Vendor" {
+		t.Fatalf("loaded vendor name = %q, want %q", Vendors[ID(0x1234)].Name, "Custom Vendor")
+	}
+	if LookupDevice(ID(0x1234), ID(0x5678)) != "Custom Device" {
+		t.Fatalf("LookupDevice() = %q, want %q", LookupDevice(ID(0x1234), ID(0x5678)), "Custom Device")
+	}
+}
+
+func TestLoadDBReturnsErrorForMissingFile(t *testing.T) {
+	original := Vendors
+	originalLogitech := LookupVendor(ID(0x046d))
+	t.Cleanup(func() {
+		Vendors = original
+	})
+
+	if _, err := loadDB(filepath.Join(t.TempDir(), "missing.ids")); err == nil {
+		t.Fatal("loadDB() error = nil, want error")
+	}
+	if LookupVendor(ID(0x046d)) != originalLogitech {
+		t.Fatal("Vendors changed after loadDB() error")
 	}
 }
