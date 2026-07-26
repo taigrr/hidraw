@@ -81,6 +81,7 @@ import usbid "github.com/taigrr/hidraw/usbids"
 // Look up by ID
 name := usbid.LookupVendor(usbid.ID(0x046d))   // "Logitech, Inc."
 name  = usbid.LookupDevice(usbid.ID(0x046d), usbid.ID(0xc52b))
+name  = usbid.LookupInterface(usbid.ID(0x046d), usbid.ID(0xc52b), usbid.ID(0x00))
 
 // Load system DB instead of embedded
 usbid.LoadSystemDB()
