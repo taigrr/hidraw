@@ -101,6 +101,32 @@ C 00  Device
 	}
 }
 
+func TestParseDoesNotAttachInterfaceAfterMalformedDevice(t *testing.T) {
+	input := `0001  Test Vendor
+	0001  Test Device
+	bad   Malformed Device
+		02  Wrong Interface
+	0002  Next Device
+		03  Right Interface
+`
+
+	vendors, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	vendor := vendors[ID(0x0001)]
+	firstDevice := vendor.Devices[ID(0x0001)]
+	if _, ok := firstDevice.Interfaces[ID(0x02)]; ok {
+		t.Fatal("interface after malformed device was attached to the previous valid device")
+	}
+
+	nextDevice := vendor.Devices[ID(0x0002)]
+	if _, ok := nextDevice.Interfaces[ID(0x03)]; !ok {
+		t.Fatal("interface after valid device was not parsed")
+	}
+}
+
 func TestParseEmbeddedIDs(t *testing.T) {
 	// Verify that the embedded DB was parsed successfully at init.
 	if Vendors == nil {
