@@ -45,6 +45,8 @@ func Parse(r io.Reader) (map[ID]Vendor, error) {
 		case 0:
 			// Vendor line: "xxxx  Name"
 			if len(trimmed) < 6 {
+				currentVendor = nil
+				currentDevice = nil
 				continue
 			}
 			hexStr := trimmed[:4]
@@ -68,11 +70,13 @@ func Parse(r io.Reader) (map[ID]Vendor, error) {
 		case 1:
 			// Device line: "\txxxx  Name"
 			if currentVendor == nil || len(trimmed) < 6 {
+				currentDevice = nil
 				continue
 			}
 			hexStr := trimmed[:4]
 			id, err := parseHexID(hexStr)
 			if err != nil {
+				currentDevice = nil
 				continue
 			}
 			name := strings.TrimSpace(trimmed[4:])

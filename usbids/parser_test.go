@@ -101,6 +101,106 @@ C 00  Device
 	}
 }
 
+func TestParseDoesNotAttachInterfaceAfterMalformedDevice(t *testing.T) {
+	input := `0001  Test Vendor
+	0001  Test Device
+	bad   Malformed Device
+		02  Wrong Interface
+	0002  Next Device
+		03  Right Interface
+`
+
+	vendors, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	vendor, ok := vendors[ID(0x0001)]
+	if !ok {
+		t.Fatal("vendor 0001 was not parsed")
+	}
+
+	firstDevice, ok := vendor.Devices[ID(0x0001)]
+	if !ok || firstDevice.Name != "Test Device" {
+		t.Fatalf("device 0001 was not parsed correctly: %+v (ok=%v)", firstDevice, ok)
+	}
+	if _, ok := firstDevice.Interfaces[ID(0x02)]; ok {
+		t.Fatal("interface after malformed device was attached to the previous valid device")
+	}
+
+	nextDevice, ok := vendor.Devices[ID(0x0002)]
+	if !ok || nextDevice.Name != "Next Device" {
+		t.Fatalf("device 0002 was not parsed correctly: %+v (ok=%v)", nextDevice, ok)
+	}
+	if _, ok := nextDevice.Interfaces[ID(0x03)]; !ok {
+		t.Fatal("interface after valid device was not parsed")
+	}
+}
+
+func TestParseDoesNotAttachInterfaceAfterTooShortDeviceLine(t *testing.T) {
+	input := `0001  Test Vendor
+	0001  Test Device
+	x
+		02  Wrong Interface
+	0002  Next Device
+		03  Right Interface
+`
+
+	vendors, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	vendor, ok := vendors[ID(0x0001)]
+	if !ok {
+		t.Fatal("vendor 0001 was not parsed")
+	}
+
+	firstDevice := vendor.Devices[ID(0x0001)]
+	if _, ok := firstDevice.Interfaces[ID(0x02)]; ok {
+		t.Fatal("interface after too-short device line was attached to the previous valid device")
+	}
+
+	nextDevice, ok := vendor.Devices[ID(0x0002)]
+	if !ok || nextDevice.Name != "Next Device" {
+		t.Fatalf("device 0002 was not parsed correctly: %+v (ok=%v)", nextDevice, ok)
+	}
+	if _, ok := nextDevice.Interfaces[ID(0x03)]; !ok {
+		t.Fatal("interface after valid device was not parsed")
+	}
+}
+
+func TestParseDoesNotAttachDeviceAfterMalformedVendorLine(t *testing.T) {
+	input := `0001  Test Vendor
+	0001  Test Device
+x
+	0002  Ghost Device
+0003  Next Vendor
+	0004  Real Device
+`
+
+	vendors, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	firstVendor, ok := vendors[ID(0x0001)]
+	if !ok {
+		t.Fatal("vendor 0001 was not parsed")
+	}
+	if _, ok := firstVendor.Devices[ID(0x0002)]; ok {
+		t.Fatal("device after too-short vendor line was attached to the previous valid vendor")
+	}
+
+	nextVendor, ok := vendors[ID(0x0003)]
+	if !ok || nextVendor.Name != "Next Vendor" {
+		t.Fatalf("vendor 0003 was not parsed correctly: %+v (ok=%v)", nextVendor, ok)
+	}
+	if _, ok := nextVendor.Devices[ID(0x0004)]; !ok {
+		t.Fatal("device after valid vendor was not parsed")
+	}
+}
+
 func TestParseEmbeddedIDs(t *testing.T) {
 	// Verify that the embedded DB was parsed successfully at init.
 	if Vendors == nil {
