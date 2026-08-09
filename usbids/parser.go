@@ -45,6 +45,8 @@ func Parse(r io.Reader) (map[ID]Vendor, error) {
 		case 0:
 			// Vendor line: "xxxx  Name"
 			if len(trimmed) < 6 {
+				currentVendor = nil
+				currentDevice = nil
 				continue
 			}
 			hexStr := trimmed[:4]
