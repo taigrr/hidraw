@@ -71,7 +71,10 @@ func walkErrAt(root string) ([]Hidraw, error) {
 			}
 			return nil
 		}
-		dev := parseDevice(path, d.Name())
+		dev, ok := parseReadableDevice(path, d.Name())
+		if !ok {
+			return nil
+		}
 		devices = append(devices, dev)
 		if d.IsDir() {
 			return filepath.SkipDir
@@ -85,6 +88,11 @@ func walkErrAt(root string) ([]Hidraw, error) {
 }
 
 func parseDevice(sysPath, name string) Hidraw {
+	dev, _ := parseReadableDevice(sysPath, name)
+	return dev
+}
+
+func parseReadableDevice(sysPath, name string) (Hidraw, bool) {
 	dev := Hidraw{
 		Path:     name,
 		PathName: "/dev/" + name,
@@ -92,7 +100,7 @@ func parseDevice(sysPath, name string) Hidraw {
 
 	uevent, err := os.ReadFile(filepath.Join(sysPath, ueventFile))
 	if err != nil {
-		return dev
+		return dev, false
 	}
 
 	for _, line := range strings.Split(string(uevent), "\n") {
@@ -120,7 +128,7 @@ func parseDevice(sysPath, name string) Hidraw {
 	dev.VendorName = usbid.LookupVendor(dev.VendorID)
 	dev.DeviceName = usbid.LookupDevice(dev.VendorID, dev.DeviceID)
 
-	return dev
+	return dev, true
 }
 
 // parseHidID extracts vendor and device IDs from a HID_ID string.

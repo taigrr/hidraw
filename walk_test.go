@@ -128,6 +128,25 @@ func TestWalkErrAtReturnsTopLevelDevicesOnly(t *testing.T) {
 	}
 }
 
+func TestWalkErrAtSkipsDevicesWithoutReadableUevent(t *testing.T) {
+	root := t.TempDir()
+	writeTestUevent(t, filepath.Join(root, "hidraw0"), "HID_ID=0003:0000046D:0000C52B\n")
+	if err := os.Mkdir(filepath.Join(root, "hidraw1"), 0o755); err != nil {
+		t.Fatalf("Mkdir() error = %v", err)
+	}
+
+	devices, err := walkErrAt(root)
+	if err != nil {
+		t.Fatalf("walkErrAt() error = %v", err)
+	}
+	if len(devices) != 1 {
+		t.Fatalf("len(devices) = %d, want 1", len(devices))
+	}
+	if devices[0].Path != "hidraw0" {
+		t.Fatalf("device path = %q, want hidraw0", devices[0].Path)
+	}
+}
+
 func TestWalkErrAtReturnsWalkErrors(t *testing.T) {
 	missingRoot := filepath.Join(t.TempDir(), "missing")
 	devices, err := walkErrAt(missingRoot)
