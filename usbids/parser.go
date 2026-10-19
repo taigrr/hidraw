@@ -19,9 +19,9 @@ func Parse(r io.Reader) (map[ID]Vendor, error) {
 	scanner := bufio.NewScanner(r)
 
 	var currentVendorID ID
-	var currentVendor *Vendor
+	var currentVendorOK bool
 	var currentDeviceID ID
-	var currentDevice *Device
+	var currentDeviceOK bool
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -45,54 +45,51 @@ func Parse(r io.Reader) (map[ID]Vendor, error) {
 		case 0:
 			// Vendor line: "xxxx  Name"
 			if len(trimmed) < 6 {
-				currentVendor = nil
-				currentDevice = nil
+				currentVendorOK = false
+				currentDeviceOK = false
 				continue
 			}
 			hexStr := trimmed[:4]
 			id, err := parseHexID(hexStr)
 			if err != nil {
-				currentVendor = nil
-				currentDevice = nil
+				currentVendorOK = false
+				currentDeviceOK = false
 				continue
 			}
 			name := strings.TrimSpace(trimmed[4:])
-			v := Vendor{
+			vendors[id] = Vendor{
 				Name:    name,
 				Devices: make(map[ID]Device),
 			}
-			vendors[id] = v
 			currentVendorID = id
-			vRef := vendors[currentVendorID]
-			currentVendor = &vRef
-			currentDevice = nil
+			currentVendorOK = true
+			currentDeviceOK = false
 
 		case 1:
 			// Device line: "\txxxx  Name"
-			if currentVendor == nil || len(trimmed) < 6 {
-				currentDevice = nil
+			if !currentVendorOK || len(trimmed) < 6 {
+				currentDeviceOK = false
 				continue
 			}
 			hexStr := trimmed[:4]
 			id, err := parseHexID(hexStr)
 			if err != nil {
-				currentDevice = nil
+				currentDeviceOK = false
 				continue
 			}
 			name := strings.TrimSpace(trimmed[4:])
-			d := Device{
+			currentVendor := vendors[currentVendorID]
+			currentVendor.Devices[id] = Device{
 				Name:       name,
 				Interfaces: make(map[ID]Interface),
 			}
-			currentVendor.Devices[id] = d
+			vendors[currentVendorID] = currentVendor
 			currentDeviceID = id
-			dRef := currentVendor.Devices[currentDeviceID]
-			currentDevice = &dRef
-			vendors[currentVendorID] = *currentVendor
+			currentDeviceOK = true
 
 		case 2:
 			// Interface line: "\t\txx  Name" (2-digit hex ID)
-			if currentDevice == nil || len(trimmed) < 4 {
+			if !currentDeviceOK || len(trimmed) < 4 {
 				continue
 			}
 			hexStr := trimmed[:2]
@@ -101,9 +98,11 @@ func Parse(r io.Reader) (map[ID]Vendor, error) {
 				continue
 			}
 			name := strings.TrimSpace(trimmed[2:])
+			currentVendor := vendors[currentVendorID]
+			currentDevice := currentVendor.Devices[currentDeviceID]
 			currentDevice.Interfaces[id] = Interface{Name: name}
-			currentVendor.Devices[currentDeviceID] = *currentDevice
-			vendors[currentVendorID] = *currentVendor
+			currentVendor.Devices[currentDeviceID] = currentDevice
+			vendors[currentVendorID] = currentVendor
 		}
 	}
 
