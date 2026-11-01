@@ -261,3 +261,37 @@ func TestLoadDBReturnsErrorForMissingFile(t *testing.T) {
 		t.Fatal("Vendors changed after loadDB() error")
 	}
 }
+
+func TestParseRejectsMissingIDSeparators(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		malformed string
+	}{
+		{"vendor", "0002Wrong Vendor\n\t0002  Wrong Device\n\t\t02  Wrong Interface\n"},
+		{"device", "\t0002Wrong Device\n\t\t02  Wrong Interface\n"},
+		{"interface", "\t\t02Wrong Interface\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			input := "0001  Vendor\n\t0001  Device\n\t\t00  Interface\n" + test.malformed +
+				"0003\tNext Vendor\n\t0004\tNext Device\n\t\t01\tNext Interface\n"
+			vendors, err := Parse(strings.NewReader(input))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(vendors) != 2 {
+				t.Errorf("got %d vendors, want 2", len(vendors))
+			}
+			vendor := vendors[ID(1)]
+			if vendor.Name != "Vendor" || len(vendor.Devices) != 1 {
+				t.Errorf("valid vendor changed: %+v", vendor)
+			}
+			device := vendor.Devices[ID(1)]
+			if device.Name != "Device" || len(device.Interfaces) != 1 || device.Interfaces[ID(0)].Name != "Interface" {
+				t.Errorf("valid device changed: %+v", device)
+			}
+			if got := vendors[ID(3)].Devices[ID(4)].Interfaces[ID(1)].Name; got != "Next Interface" {
+				t.Errorf("valid tab-separated hierarchy did not recover: %q", got)
+			}
+		})
+	}
+}
