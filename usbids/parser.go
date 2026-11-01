@@ -44,7 +44,7 @@ func Parse(r io.Reader) (map[ID]Vendor, error) {
 		switch tabs {
 		case 0:
 			// Vendor line: "xxxx  Name"
-			if len(trimmed) < 6 {
+			if len(trimmed) < 6 || (trimmed[4] != ' ' && trimmed[4] != '\t') {
 				currentVendorOK = false
 				currentDeviceOK = false
 				continue
@@ -67,7 +67,7 @@ func Parse(r io.Reader) (map[ID]Vendor, error) {
 
 		case 1:
 			// Device line: "\txxxx  Name"
-			if !currentVendorOK || len(trimmed) < 6 {
+			if !currentVendorOK || len(trimmed) < 6 || (trimmed[4] != ' ' && trimmed[4] != '\t') {
 				currentDeviceOK = false
 				continue
 			}
@@ -89,7 +89,7 @@ func Parse(r io.Reader) (map[ID]Vendor, error) {
 
 		case 2:
 			// Interface line: "\t\txx  Name" (2-digit hex ID)
-			if !currentDeviceOK || len(trimmed) < 4 {
+			if !currentDeviceOK || len(trimmed) < 4 || (trimmed[2] != ' ' && trimmed[2] != '\t') {
 				continue
 			}
 			hexStr := trimmed[:2]
